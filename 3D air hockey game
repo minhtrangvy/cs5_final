@@ -1,0 +1,552 @@
+#
+# final_project.py
+#
+# Name: MinhTrang Vy & Ana Karina Villa Meza
+#
+
+from visual import *
+import math
+import random
+import time
+
+class Puck:
+    """ Our puck
+    """
+    # make x, y, z axes with labels
+    def __init__(self, pos, heading=vector(0,0,1),velocity=vector(1,0,0)):
+        """ constructor for our alien class """
+        import random
+        # list of vPython 3D shapes that make up this puck
+        self.parts = []
+        # Position of the origin of puck; we make sure it's a vector
+        # For consistency, we use the same name as VPython's objects
+        self.pos = vector(pos)
+        # Direction in which puck is moving, normalized to unit length
+        # This will need to change to make each player hit the ball
+        self.heading = norm(heading)
+        self.velocity = norm(velocity)
+        self.strafe_direction = rotate(self.heading, angle=math.pi/2.0, axis=(0,1,0))
+        
+        # the main body of our puck is a cylinder
+        body = cylinder(pos=self.pos,axis=(0,.45,0),radius=.4, color=color.orange)
+        #will need to change this so that whenever the puck is hit, the color changes
+        # if collide with alien1 == True:
+        #   body.color = color.red
+        # elif collide with alien2 == True:
+        #   body.color = color.blue
+        # else:
+        #   body.color = color.orange
+        left_eye = sphere(pos=self.pos+vector(.25,.15,.5), radius=0.1, color=color.white)
+        left_eye_circle = sphere(pos=self.pos+vector(.25,.15,.52), radius=0.09, color=color.black)
+        right_eye = sphere(pos=self.pos+vector(-.25,.15,.5), radius=0.1, color=color.white)
+        right_eye_circle = sphere(pos=self.pos+vector(-.25,.15,.52), radius=0.09, color=color.black)
+        antenna = arrow(pos=self.pos+vector(0,1,0), axis=(0,0,.5), shaftwidth=.1, color=color.cyan)
+
+        # the puck is made up of this list of parts!
+        self.parts += [body, left_eye, left_eye_circle,right_eye, right_eye_circle, antenna] #, circle, left_eye, right_eye, antenna, left_eye_circle,right_eye_circle]
+
+        # give self. names to parts we want to use by name in the future
+        self.body = body
+        self.antenna = antenna
+
+        self.vel=vector(1,0,0)
+
+    def __repr__(self):
+        """ prints the pieces, position, and heading of self """
+        s = "  position:" + str(self.pos) + "\n"
+        s += "  heading: " + str(self.heading) + "\n"
+        return s
+
+    def right(self, amount):
+        ''' Change alien's location by moving  right by a given amount '''
+        motion_vector = amount * self.strafe_direction
+        self.pos += motion_vector
+        for part in self.parts:
+            part.pos += motion_vector
+
+    def left(self, amount):
+        ''' Change alien's location by moving left 
+             by a given amount '''
+        motion_vector = amount * -self.strafe_direction
+        self.pos += motion_vector
+        for part in self.parts:
+            part.pos += motion_vector
+
+    def turnleft(self, angle):
+        ''' Turn the alien by the given angle, in degrees '''
+        # convert the angle to radians first
+        theta = math.radians(angle)
+        # rotate the heading vector around the vertical y-axis
+        self.heading = rotate(self.heading, angle=theta, axis=(0,1,0))
+        # rotate all of the parts around the current position
+        for part in self.parts:
+            part.rotate(angle=theta, axis=(0,1,0), origin=self.pos)
+
+    
+    def forward(self, amount):
+        ''' Change robot's location by moving in 
+            the heading direction by a given amount '''
+        # compute the vector to move
+        motion_vector = amount * self.heading
+        # add it to every robot part's position
+        for part in self.parts:
+            part.pos += motion_vector
+        # finally, add it to the overall robot's position
+        self.pos += motion_vector
+
+    def setpos(self, newpos):
+        ''' Change robot's location by moving in 
+            the heading direction by a given amount '''
+        # compute the vector to move
+        for part in self.parts:
+            part.pos = newpos
+        # finally, add it to the overall robot's position
+        self.pos = newpos
+
+    def backward(self, amount):
+        ''' Change robot's location by moving in 
+            the heading direction by a given amount '''
+        # compute the vector to move
+        motion_vector = -amount * self.heading
+        # add it to every robot part's position
+        for part in self.parts:
+            part.pos += motion_vector
+        # finally, add it to the overall robot's position
+        self.pos += motion_vector
+
+    def up(self,amount):
+        """ Change robot's location by moving up or down
+            by the given amount"""
+        # compute the vector to move
+        move_up = vector(0,1,0)
+        motion_vector = amount * move_up
+        # add it to every robot part's position
+        for part in self.parts:
+            part.pos += motion_vector
+        # finally, add it to the overall robot's position
+        self.pos += motion_vector
+
+    def strafe(self,amount):
+        """ Robot should move immediately to its left and right """
+        strafe_direction = rotate(self.heading, angle=math.pi/2.0, axis=(0,1,0))
+        motion_vector = amount * strafe_direction
+        # add it to every robot part's position
+        for part in self.parts:
+            part.pos += motion_vector
+        # finally, add it to the overall robot's position
+        self.pos += motion_vector
+        
+
+    def turn(self, angle):
+        ''' Turn the robot by the given angle, in degrees '''
+        # convert the angle to radians first
+        theta = math.radians(angle)
+        # rotate the heading vector around the vertical y-axis
+        rotation_axis = vector(0,1,0)
+        # rotate all of the parts around the rotation_axis, centered at
+        # the robot's origin, which is self.pos
+        robots_origin = self.pos
+        for part in self.parts:
+            part.rotate(angle=theta, axis=rotation_axis, origin=robots_origin)
+        # create a new heading for the whole robot
+        self.heading = rotate(self.heading, angle=theta, axis=rotation_axis)
+
+class Alien:
+    """ a collection of VPython parts that
+        will move together == an alien!
+        this is our handle to hit the puck with!
+    """
+    # make x, y, z axes with labels
+    def __init__(self, pos, heading=vector(0,0,1)):
+        """ constructor for our alien class """
+        # list of vPython 3D shapes that make up this alien
+        self.parts = []
+        # Position of the origin of alien; we make sure it's a vector
+        # For consistency, we use the same name as VPython's objects
+        self.pos = vector(pos)
+        # Direction in which alien is moving, normalized to unit length
+        self.heading = norm(heading)
+        self.strafe_direction = rotate(self.heading, angle=math.pi/2.0, axis=(0,1,0))
+        
+        # the main body of our alien is a sphere
+        body = sphere(pos=self.pos, radius=.5, color=color.green)
+        left_eye = sphere(pos=self.pos+vector(.25,.15,.5), radius=0.1, color=color.white)
+        left_eye_circle = sphere(pos=self.pos+vector(.25,.15,.52), radius=0.09, color=color.black)
+        right_eye = sphere(pos=self.pos+vector(-.25,.15,.5), radius=0.1, color=color.white)
+        right_eye_circle = sphere(pos=self.pos+vector(-.25,.15,.52), radius=0.09, color=color.black)
+        middle_eye = sphere(pos=self.pos+vector(0,.2,.5), radius=0.1, color=color.white)
+        middle_eye_circle = sphere(pos=self.pos+vector(.0,.2,.52), radius=0.09, color=color.black)
+        antenna = arrow(pos=self.pos+vector(0,1,0), axis=(0,0,.5), shaftwidth=.1)
+
+        # the alien is made up of this list of parts!
+        self.parts += [body, left_eye, right_eye, middle_eye, antenna, left_eye_circle,right_eye_circle,middle_eye_circle]
+
+        # give self. names to parts we want to use by name in the future
+        self.body = body
+        self.antenna = antenna
+
+
+    def __repr__(self):
+        """ prints the pieces, position, and heading of self """
+        s = "  position:" + str(self.pos) + "\n"
+        s += "  heading: " + str(self.heading) + "\n"
+        return s
+
+    def right(self, amount):
+        ''' Change alien's location by moving  right by a given amount '''
+        motion_vector = amount * self.strafe_direction
+        self.pos += motion_vector
+        for part in self.parts:
+            part.pos += motion_vector
+
+    def left(self, amount):
+        ''' Change alien's location by moving left 
+             by a given amount '''
+        motion_vector = amount * -self.strafe_direction
+        self.pos += motion_vector
+        for part in self.parts:
+            part.pos += motion_vector
+
+    def turnleft(self, angle):
+        ''' Turn the alien by the given angle, in degrees '''
+        # convert the angle to radians first
+        theta = math.radians(angle)
+        # rotate the heading vector around the vertical y-axis
+        self.heading = rotate(self.heading, angle=theta, axis=(0,1,0))
+        # rotate all of the parts around the current position
+        for part in self.parts:
+            part.rotate(angle=theta, axis=(0,1,0), origin=self.pos)
+    
+    def forward(self, amount):
+        ''' Change robot's location by moving in 
+            the heading direction by a given amount '''
+        # compute the vector to move
+        motion_vector = amount * self.heading
+        # add it to every robot part's position
+        for part in self.parts:
+            part.pos += motion_vector
+        # finally, add it to the overall robot's position
+        self.pos += motion_vector
+
+    def backward(self, amount):
+        ''' Change robot's location by moving in 
+            the heading direction by a given amount '''
+        # compute the vector to move
+        motion_vector = -amount * self.heading
+        # add it to every robot part's position
+        for part in self.parts:
+            part.pos += motion_vector
+        # finally, add it to the overall robot's position
+        self.pos += motion_vector
+
+    def up(self,amount):
+        """ Change robot's location by moving up or down
+            by the given amount"""
+        # compute the vector to move
+        move_up = vector(0,1,0)
+        motion_vector = amount * move_up
+        # add it to every robot part's position
+        for part in self.parts:
+            part.pos += motion_vector
+        # finally, add it to the overall robot's position
+        self.pos += motion_vector
+
+    def strafe(self,amount):
+        """ Robot should move immediately to its left and right """
+        strafe_direction = rotate(self.heading, angle=math.pi/2.0, axis=(0,1,0))
+        motion_vector = amount * strafe_direction
+        # add it to every robot part's position
+        for part in self.parts:
+            part.pos += motion_vector
+        # finally, add it to the overall robot's position
+        self.pos += motion_vector
+        
+
+    def turn(self, angle):
+        ''' Turn the robot by the given angle, in degrees '''
+        # convert the angle to radians first
+        theta = math.radians(angle)
+        # rotate the heading vector around the vertical y-axis
+        rotation_axis = vector(0,1,0)
+        # rotate all of the parts around the rotation_axis, centered at
+        # the robot's origin, which is self.pos
+        robots_origin = self.pos
+        for part in self.parts:
+            part.rotate(angle=theta, axis=rotation_axis, origin=robots_origin)
+        # create a new heading for the whole robot
+        self.heading = rotate(self.heading, angle=theta, axis=rotation_axis)
+
+def main():
+
+    # set up the visual conditions - the window is called "scene"
+    scene.autoscale = True  # should the scene fill the window?
+    scene.background = color.black  # the background "space" color
+    scene.title = "Air Hockey!"
+    
+    # controlled alien 1 and 2 (players 1 and 2)
+    alien1 = Alien(pos=(0,2.5,6))
+    alien1.antenna.color = color.red
+    alien2 = Alien(pos=(0,2.5,-6))
+    alien2.antenna.color = color.blue
+
+    # the puck
+    puck1 = Puck(pos=(0,2,0))
+
+    #scoreboard
+    text(text='First score wins!',pos=(0,10,0), depth=-0.3, color=color.green)
+
+    # the score
+    alien1.score = 0
+    alien2.score = 0
+
+    # this is all the code for the air hockey table
+    table = box(pos=(0,0,0), length=12.0, height=3.0,
+                width=18.0, color=(1,1,1))
+    
+    field1 = box(pos=(0,1.7,0), length=10.0, height=.3,
+                width=16.0, color=(1.2,0.013,1))
+    field2 = box(pos=(0,1.75,0), length=10.0, height=.3,
+                width=.2, color=(1,1,1))
+    field3 = box(pos=(0,1.75,-5.5), length=4.0, height=.3,
+                width=.2, color=(1,1,1))
+    field4 = box(pos=(-2,1.75,-6.75), length=.2, height=.3,
+                width=2.7, color=(1,1,1))
+    field5 = box(pos=(2,1.75,-6.75), length=.2, height=.3,
+                width=2.7, color=(1,1,1))
+    field6 = box(pos=(0,1.75,5.5), length=4.0, height=.3,
+                width=.2, color=(1,1,1))
+    field7 = box(pos=(-2,1.75,6.75), length=.2, height=.3,
+                width=2.7, color=(1,1,1))
+    field8 = box(pos=(2,1.75,6.75), length=.2, height=.3,
+                width=2.7, color=(1,1,1))
+    
+    leg1 = box(pos=(-4.5,-2,-7.5), length=2.0, height=6.0, width=2.0, color=(1,1,1))
+    leg2 = box(pos=(-4.5,-2,7.5), length=2.0, height=6.0, width=2.0, color=(1,1,1))
+    leg3 = box(pos=(4.5,-2,7.5), length=2.0, height=6.0, width=2.0, color=(1,1,1))
+    leg4 = box(pos=(4.5,-2,-7.5), length=2.0, height=6.0, width=2.0, color=(1,1,1))
+
+    border1 = box(pos=(-5.5,1.8,0), length=1, height=1, width=18.0, color=(1,1,1))
+    border2 = box(pos=(5.5,1.8,0), length=1, height=1, width=18.0, color=(1,1,1))
+    border3 = box(pos=(0,1.8,8.5), length=10, height=1, width=1.0, color=(1,1,1))
+    border4 = box(pos=(0,1.8,-8.5), length=10, height=1, width=1.0, color=(1,1,1))
+
+    goal1 = box(pos=(0,1.75,8.3),length=10, height=1, width=1.5, color=color.black)
+    goal2 = box(pos=(0,1.75,-8.3),length=10, height=1, width=1.5, color=color.black)
+
+    # It's easier to adjust constants if they have names
+    #      and are all together in one place...
+    TURN_AMOUNT = 5 # degrees
+    MOVE_AMOUNT = .3 # units
+    RATE = 30 # hertz
+    dt = 1.0/RATE # time per step
+    
+    alien1.turnleft(180) # makes the aliens face each other
+   
+   #so we can turn the table before the game starts
+    time.sleep(5)
+
+    puck1.turnleft(random.uniform(0,360))
+
+    ##puck1.forward(.05)
+    puck1.vel=vector(1,0,0)
+    ##puck1.pos += dt*puck1.vel
+
+    speed = .2
+    upperbound = 7.3
+    lowerbound = -7.3
+    leftbound = -3.7
+    rightbound = 3.7
+    turnanglex = 90
+    turnanglez = 240
+
+    # the main loop - handle user events
+    while True:
+        #x_amt =  random.uniform(-0.1,0.1)  # you choose the range
+        #table.pos += vector(x_amt,0,0)
+
+        puck1.forward(speed)
+
+        """if puck1.pos.x < rightbound and puck1.pos.x > leftbound:
+            puck1.forward(speed)
+            puck1.vel=vector(1,0,0)
+            #puck1.pos += dt*puck1.vel"""
+
+        if puck1.pos.x > rightbound: #need to find what position (10) this is
+            #puck1.vel=vector(0,0,0)
+            puck1.pos.x = rightbound
+            #puck1.turn(turnanglex)
+            puck1.heading.x *= -1
+            #puck1.vel=vector(1,0,0)
+            #puck1.forward(speed)
+
+        if puck1.pos.x < leftbound:
+            puck1.pos.x = leftbound
+            puck1.heading.x *= -1
+            #puck1.vel=vector(0,0,0)
+            #puck1.turn(turnanglex) 
+            #puck1.pos.x = -2
+            #puck1.vel=vector(1,0,0)
+            #puck1.forward(speed)
+
+        """if puck1.pos.z > lowerbound and puck1.pos.z < upperbound:
+            puck1.forward(speed)
+            #puck1.pos += dt*puck1.vel
+            puck1.vel=vector(1,0,0)
+            #puck1.pos += dt*puck1.vel"""
+
+        if puck1.pos.z > upperbound: #need to find what position (10) this is
+            #puck1.pos.z = 0
+            #puck1.pos.x = 0
+            puck1.heading.z *= -1
+            puck1.setpos(vector(0,2,0))
+            #puck1.vel.z *= -1
+            #puck1.pos.z = upperbound
+            alien1.score += 1
+            # ADD ONE TO THE SCORE OF ALIEN WHAT?
+
+        if puck1.pos.z < lowerbound:
+            #puck1.pos.z = 0
+            #puck1.pos.x = 0
+            puck1.setpos(vector(0,2,0))
+            puck1.heading.z *= -1
+            #puck1.vel.z *= -1
+            #puck1.pos.z = lowerbound
+            alien2.score += 1
+            # ADD ONE TO THE SCORE OF ALIEN WHAT?
+
+        #print alien1.score
+        #print alien2.score
+
+        # It's easier to adjust constants if they
+        # have names and are all in one place!
+        TURN_AMOUNT = 5 # degrees
+        MOVE_AMOUNT = .8 # units
+        #MOVE_TABLE = False
+        
+        rate(30)  # at most 30 loops per second
+
+        
+        if scene.mouse.clicked != 0: # mouse click?
+            event = scene.mouse.getclick() # remove event
+            scene.mouse.events = 0 # reset mouse events
+            
+        if scene.mouse.clicked != 0: # is there a mouse click?
+            print "mouse click!"
+            event = scene.mouse.getclick() # remove event
+            scene.mouse.events = 0 # then reset mouse events
+            
+        if scene.kb.keys: # is there a keyevent?
+            s = scene.kb.getkey() # get keypress
+            #print "keypress is", s
+            """if s == "p": 
+                print alien1
+            if s == "j":
+                alien1.turn(TURN_AMOUNT)
+            if s == "i":
+                alien1.forward(MOVE_AMOUNT)
+            if s == "g":
+                MOVE_alien2 = not MOVE_alien2  # toggle alien2's motion
+            if s == "y":
+                MOVE_TABLE = not MOVE_TABLE"""
+
+
+            # controls for alien1
+            #if s == "i":
+            #    alien1.turnleft(TURN_AMOUNT) #turns counter clockwise
+            if s == "left":
+                alien1.strafe(MOVE_AMOUNT) #moves in direction of motion
+            if s == "right":
+                alien1.strafe(-MOVE_AMOUNT) #moves opposite the arrow"""
+            if s == "d":
+                alien2.strafe(MOVE_AMOUNT) #moves in direction of motion
+            if s == "a":
+                alien2.strafe(-MOVE_AMOUNT) #moves opposite the arrow"""
+            #if s == "left":
+            #    alien1.left(MOVE_AMOUNT) # moves to the right of the eyes
+            #if s == "right":
+            #   alien1.right(MOVE_AMOUNT) #moves to the left of the eyes
+
+            # controls for alien2
+            """if s == "i":
+                alien2.turnleft(TURN_AMOUNT) #turns counter clockwise
+            if s == "o":
+                alien2.turnright(TURN_AMOUNT) #turns clockwise"""
+            if s == "up":
+                alien1.forward(MOVE_AMOUNT) #moves in direction of motion
+            if s == "down":
+                alien1.backward(MOVE_AMOUNT) #moves opposite the arrow
+            if s == "w":
+                alien2.forward(MOVE_AMOUNT) # moves to the right of the eyes
+            if s == "s":
+                alien2.backward(MOVE_AMOUNT) #moves to the left of the eyes
+
+            # controls for puck1
+            """if s == "i":
+                alien2.turnleft(TURN_AMOUNT) #turns counter clockwise
+            if s == "o":
+                alien2.turnright(TURN_AMOUNT) #turns clockwise"""
+            if s == "8":
+                puck1.forward(MOVE_AMOUNT) #moves in direction of motion
+            if s == "5":
+                puck1.backward(MOVE_AMOUNT) #moves opposite the arrow
+            if s == "4":
+                puck1.left(MOVE_AMOUNT) # moves to the right of the eyes
+            if s == "6":
+                puck1.right(MOVE_AMOUNT) #moves to the left of the eyes
+
+            """while MOVE_TABLE == True:
+                x_amt =  random.uniform(-0.001,0.001)  # you choose the range
+                table.pos += vector(x_amt,0,0)
+                y_amt =  random.uniform(-0.001,0.001)  # you choose the range
+                table.pos += vector(0,y_amt ,0)
+                z_amt =  random.uniform(-0.001,0.001)  # you choose the range
+                table.pos += vector(0,0,z_amt)"""
+
+        #
+        # check the state of the "game"
+        #
+
+        # update moving objects' positions...
+        #
+        """if MOVE_alien2 == True:
+            alien2.heading = mag(alien1.main.pos - alien2.main.pos) # go back toward origin
+            alien2.forward(dt)"""                   # update position smoothly
+            # alien2.heading is being used as the velocity; dt as time step
+
+        # see whether alien1 is touching the table
+        """if (table.pos.x-2.5) < abs(alien1.pos.x) < (table.pos.x+2.5) and (table.pos.z-2.5) < abs(alien1.pos.z) < (table.pos.z+2.5):
+            table.color = color.blue # lightness, 0 to 1
+        else:
+            table.color = color.gray(0.75) # blue, if in the table"""
+
+        distance = .8
+            
+        # and whether the puck is touching the alien
+        alien1_dist = mag(alien1.body.pos - puck1.body.pos)
+        alien2_dist = mag(alien2.body.pos - puck1.body.pos)
+        if abs(alien1_dist) < distance:
+            alien1.body.color = color.red # if so, red
+            puck1.body.color = color.red
+            puck1.turn(120) 
+            #puck1.pos.x = -2
+            puck1.forward(speed)
+        else:
+            alien1.body.color = color.green # if not, green
+        if abs(alien2_dist) < distance:
+            alien2.body.color = color.blue # if so, blue
+            puck1.body.color = color.blue
+            puck1.turn(120) 
+            #puck1.pos.x = -2
+            puck1.forward(speed)
+        else:
+            alien2.body.color = color.green # if not, green
+
+        #ends the game with the winner, dont know why the scores and the players are switched
+        if alien1.score > 4:
+            text(text='Alien 2 wins!!',pos=(0,8,0), depth=-0.3, color=color.blue)
+            break
+        elif alien2.score > 4:
+            text(text='Alien 1 wins!!',pos=(0,8,0), depth=-0.3, color=color.red)
+            break
+
+main()
